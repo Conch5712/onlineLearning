@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import CourseManagement from './CourseManagement';
 import ActivityManagement from './ActivityManagement';
 import StudentManagement from './StudentManagement';
+import GradingWorkbench from './GradingWorkbench';
+import ChapterManagement from './ChapterManagement';
 
 const TeacherDashboard = () => {
   const { user, logout } = useAuth();
   const [activeModule, setActiveModule] = useState('home');
+  const [recentSubmissions, setRecentSubmissions] = useState([]);
 
   const modules = [
     { 
@@ -15,29 +19,41 @@ const TeacherDashboard = () => {
       description: 'Teacher work overview',
       icon: '🏠'
     },
-    { 
-      id: 'courses', 
-      name: 'Course Management', 
+    {
+      id: 'courses',
+      name: 'Course Management',
       description: 'Create and manage course content',
       icon: '📚',
       badge: '5'
     },
-    { 
-      id: 'activities', 
-      name: 'Activity Management', 
+    {
+      id: 'chapters',
+      name: 'Chapter Management',
+      description: 'Organize course content into chapters',
+      icon: '📖'
+    },
+    {
+      id: 'activities',
+      name: 'Activity Management',
       description: 'Create and manage course activities',
       icon: '🎯',
       badge: '12'
     },
-    { 
-      id: 'students', 
-      name: 'Student Management', 
+    {
+      id: 'students',
+      name: 'Student Management',
       description: 'View and manage student information',
       icon: '👥'
     },
-    { 
-      id: 'analytics', 
-      name: 'Teaching Analytics', 
+    {
+      id: 'grading',
+      name: 'Grading Workbench',
+      description: 'Grade student submissions and manage feedback',
+      icon: '📝'
+    },
+    {
+      id: 'analytics',
+      name: 'Teaching Analytics',
       description: 'View teaching data and student performance',
       icon: '📊'
     },
@@ -61,9 +77,50 @@ const TeacherDashboard = () => {
     }
   ];
 
+  useEffect(() => {
+    if (user && user.id && activeModule === 'home') {
+      fetchRecentSubmissions();
+    }
+  }, [user, activeModule]);
+
+  const fetchRecentSubmissions = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `http://localhost:8080/api/submissions/recent/teacher/${user.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setRecentSubmissions(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch recent submissions:', error);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     window.location.href = '/login';
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) {
+      return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
   };
 
   const renderModuleContent = () => {
@@ -108,38 +165,40 @@ const TeacherDashboard = () => {
             </div>
 
             <div className="quick-actions">
-              <h3>📋 Recent Activities</h3>
+              <h3>📋 Recent Submissions</h3>
               <div className="activity-feed">
-                <div className="activity-item">
-                  <div className="activity-icon">🎯</div>
-                  <div className="activity-content">
-                    <h4>Data Structure Assignment Grading</h4>
-                    <p>23 activities pending | Due: Tomorrow</p>
+                {recentSubmissions.length === 0 ? (
+                  <div className="empty-activity">
+                    <p>No recent submissions to display</p>
                   </div>
-                  <div className="activity-action">
-                    <button className="btn-primary">Start Grading</button>
-                  </div>
-                </div>
-                <div className="activity-item">
-                  <div className="activity-icon">📚</div>
-                  <div className="activity-content">
-                    <h4>Algorithm Design Course Update</h4>
-                    <p>New chapter published | 15 students viewed</p>
-                  </div>
-                  <div className="activity-action">
-                    <button className="btn-secondary">View Details</button>
-                  </div>
-                </div>
-                <div className="activity-item">
-                  <div className="activity-icon">💬</div>
-                  <div className="activity-content">
-                    <h4>Student Q&A</h4>
-                    <p>5 new questions awaiting reply</p>
-                  </div>
-                  <div className="activity-action">
-                    <button className="btn-secondary">Reply</button>
-                  </div>
-                </div>
+                ) : (
+                  recentSubmissions.slice(0, 5).map((submission, index) => (
+                    <div key={submission.id || index} className="activity-item">
+                      <div className="activity-icon">
+                        {submission.status === 'SUBMITTED' ? '🎯' :
+                         submission.status === 'GRADED' ? '✅' : '🔄'}
+                      </div>
+                      <div className="activity-content">
+                        <h4>Student #{submission.studentId} - Activity #{submission.activityId}</h4>
+                        <p>
+                          Status: {submission.status} |
+                          {submission.score !== null && submission.score !== undefined
+                            ? ` Score: ${submission.score} pts | `
+                            : ' '}
+                          {formatDate(submission.submittedAt)}
+                        </p>
+                      </div>
+                      <div className="activity-action">
+                        <button
+                          className="btn-primary"
+                          onClick={() => setActiveModule('grading')}
+                        >
+                          {submission.status === 'SUBMITTED' ? 'Grade Now' : 'View'}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -174,11 +233,17 @@ const TeacherDashboard = () => {
       case 'courses':
         return <CourseManagement user={user} />;
 
+      case 'chapters':
+        return <ChapterManagement user={user} />;
+
       case 'activities':
         return <ActivityManagement user={user} />;
 
       case 'students':
         return <StudentManagement />;
+
+      case 'grading':
+        return <GradingWorkbench user={user} />;
 
       default:
         return (

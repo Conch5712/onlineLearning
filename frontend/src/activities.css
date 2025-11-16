@@ -320,3 +320,50 @@
   color: #999;
   font-style: italic;
 }
+
+/* Duplicate Activity Modal Styles */
+.duplicate-info {
+  margin-bottom: 1.5rem;
+}
+
+.duplicate-info p {
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.activity-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e1e8ed;
+}
+
+.activity-preview .activity-icon {
+  font-size: 2rem;
+  margin-top: 0.2rem;
+}
+
+.activity-preview h4 {
+  color: #1e3d59;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.activity-preview p {
+  color: #666;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.5rem;
+  color: #6c757d;
+  font-size: 0.85rem;
+  font-style: italic;
+}

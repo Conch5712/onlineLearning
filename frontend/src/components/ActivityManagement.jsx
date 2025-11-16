@@ -11,10 +11,15 @@ const ActivityManagement = ({ user }) => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingActivity, setEditingActivity] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [selectedActivityType, setSelectedActivityType] = useState('ASSIGNMENT');
-  
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicatingActivity, setDuplicatingActivity] = useState(null);
+  const [targetCourseId, setTargetCourseId] = useState('');
+
   // 文件管理状态
   const [attachmentFiles, setAttachmentFiles] = useState([]);
 
@@ -199,12 +204,119 @@ const ActivityManagement = ({ user }) => {
       await axios.delete(`http://localhost:8080/api/activities/${activityId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       setActivities(activities.filter(activity => activity.id !== activityId));
       alert('Activity deleted successfully!');
     } catch (error) {
       console.error('Failed to delete activity:', error);
       alert('Failed to delete activity, please try again');
+    }
+  };
+
+  const openEditForm = (activity) => {
+    // 格式化日期为 datetime-local 输入格式
+    const formatDateForInput = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    setEditingActivity({
+      ...activity,
+      dueDate: formatDateForInput(activity.dueDate)
+    });
+    setShowEditForm(true);
+  };
+
+  const updateActivity = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+
+      // 格式化日期为后端需要的格式
+      const formatDateTime = (dateString) => {
+        if (!dateString) return null;
+        const date = new Date(dateString);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      };
+
+      const activityData = {
+        ...editingActivity,
+        dueDate: formatDateTime(editingActivity.dueDate)
+      };
+
+      console.log('Updating activity with data:', activityData);
+
+      const response = await axios.put(
+        `http://localhost:8080/api/activities/${editingActivity.id}`,
+        activityData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Activity updated successfully:', response.data);
+
+      setActivities(activities.map(activity =>
+        activity.id === editingActivity.id ? response.data : activity
+      ));
+      setShowEditForm(false);
+      setEditingActivity(null);
+      alert('Activity updated successfully!');
+    } catch (error) {
+      console.error('Failed to update activity:', error);
+      console.error('Error response:', error.response?.data);
+      alert('Failed to update activity: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const openDuplicateModal = (activity) => {
+    setDuplicatingActivity(activity);
+    setTargetCourseId(selectedCourse);
+    setShowDuplicateModal(true);
+  };
+
+  const duplicateActivity = async () => {
+    if (!targetCourseId) {
+      alert('Please select a target course');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `http://localhost:8080/api/activities/${duplicatingActivity.id}/duplicate?targetCourseId=${targetCourseId}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      alert('Activity duplicated successfully!');
+      setShowDuplicateModal(false);
+      setDuplicatingActivity(null);
+
+      // 如果目标课程是当前课程,刷新列表
+      if (parseInt(targetCourseId) === parseInt(selectedCourse)) {
+        fetchActivities(selectedCourse);
+      }
+    } catch (error) {
+      console.error('Failed to duplicate activity:', error);
+      alert('Failed to duplicate activity: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -549,6 +661,169 @@ const ActivityManagement = ({ user }) => {
         </div>
       )}
 
+      {/* Edit activity form */}
+      {showEditForm && editingActivity && (
+        <div className="modal-overlay">
+          <div className="modal-content large">
+            <div className="modal-header">
+              <h3>Edit Activity</h3>
+              <button
+                className="close-btn"
+                onClick={() => {
+                  setShowEditForm(false);
+                  setEditingActivity(null);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={updateActivity}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Activity Type</label>
+                  <select
+                    value={editingActivity.activityType}
+                    onChange={(e) => setEditingActivity({...editingActivity, activityType: e.target.value})}
+                    required
+                  >
+                    <option value="ASSIGNMENT">Assignment</option>
+                    <option value="QUIZ">Quiz</option>
+                    <option value="ANNOUNCEMENT">Announcement</option>
+                    <option value="PRACTICE">Practice</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Submission Type</label>
+                  <select
+                    value={editingActivity.submissionType}
+                    onChange={(e) => setEditingActivity({...editingActivity, submissionType: e.target.value})}
+                  >
+                    <option value="FILE">File Upload</option>
+                    <option value="TEXT">Text Entry</option>
+                    <option value="MULTIPLE_CHOICE">Multiple Choice</option>
+                    <option value="URL">URL Link</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Activity Title</label>
+                <input
+                  type="text"
+                  value={editingActivity.title}
+                  onChange={(e) => setEditingActivity({...editingActivity, title: e.target.value})}
+                  required
+                  placeholder="Enter activity title"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Description</label>
+                <textarea
+                  value={editingActivity.description || ''}
+                  onChange={(e) => setEditingActivity({...editingActivity, description: e.target.value})}
+                  placeholder="Enter activity description"
+                  rows="3"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Instructions</label>
+                <textarea
+                  value={editingActivity.instructions || ''}
+                  onChange={(e) => setEditingActivity({...editingActivity, instructions: e.target.value})}
+                  placeholder="Detailed requirements and instructions"
+                  rows="5"
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Due Date</label>
+                  <input
+                    type="datetime-local"
+                    value={editingActivity.dueDate}
+                    onChange={(e) => setEditingActivity({...editingActivity, dueDate: e.target.value})}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Max Score</label>
+                  <input
+                    type="number"
+                    value={editingActivity.maxScore}
+                    onChange={(e) => setEditingActivity({...editingActivity, maxScore: parseFloat(e.target.value)})}
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Attempts Allowed</label>
+                  <input
+                    type="number"
+                    value={editingActivity.attemptsAllowed}
+                    onChange={(e) => setEditingActivity({...editingActivity, attemptsAllowed: parseInt(e.target.value)})}
+                    min="-1"
+                    placeholder="-1 for unlimited"
+                  />
+                </div>
+              </div>
+
+              {editingActivity.activityType === 'QUIZ' && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Time Limit (minutes)</label>
+                    <input
+                      type="number"
+                      value={editingActivity.timeLimitMinutes || ''}
+                      onChange={(e) => setEditingActivity({...editingActivity, timeLimitMinutes: parseInt(e.target.value) || null})}
+                      min="1"
+                      placeholder="Optional time limit"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Grading Method</label>
+                    <select
+                      value={editingActivity.gradingMethod}
+                      onChange={(e) => setEditingActivity({...editingActivity, gradingMethod: e.target.value})}
+                    >
+                      <option value="AUTO">Auto Grade</option>
+                      <option value="MANUAL">Manual Grade</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={editingActivity.isRequired}
+                    onChange={(e) => setEditingActivity({...editingActivity, isRequired: e.target.checked})}
+                  />
+                  Required Activity
+                </label>
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn-secondary" onClick={() => {
+                  setShowEditForm(false);
+                  setEditingActivity(null);
+                }}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  Update Activity
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Activities list */}
       <div className="activities-list">
         {filteredActivities.length === 0 ? (
@@ -614,14 +889,14 @@ const ActivityManagement = ({ user }) => {
               </div>
               
               <div className="activity-actions">
-                <button 
+                <button
                   className="btn-primary"
                   onClick={() => navigate(`/activity/${activity.id}`)}
                 >
                   查看详情
                 </button>
                 {!activity.isPublished && (
-                  <button 
+                  <button
                     className="btn-primary"
                     onClick={() => publishActivity(activity.id)}
                   >
@@ -631,10 +906,19 @@ const ActivityManagement = ({ user }) => {
                 <button className="btn-secondary">
                   View Submissions (0)
                 </button>
-                <button className="btn-secondary">
+                <button
+                  className="btn-secondary"
+                  onClick={() => openEditForm(activity)}
+                >
                   Edit
                 </button>
-                <button 
+                <button
+                  className="btn-info"
+                  onClick={() => openDuplicateModal(activity)}
+                >
+                  📋 Duplicate
+                </button>
+                <button
                   className="btn-danger"
                   onClick={() => deleteActivity(activity.id)}
                 >
@@ -645,6 +929,57 @@ const ActivityManagement = ({ user }) => {
           ))
         )}
       </div>
+
+      {/* Duplicate Activity Modal */}
+      {showDuplicateModal && duplicatingActivity && (
+        <div className="modal-overlay" onClick={() => setShowDuplicateModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>📋 Duplicate Activity</h3>
+              <button className="close-btn" onClick={() => setShowDuplicateModal(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="duplicate-info">
+                <p><strong>Activity to duplicate:</strong></p>
+                <div className="activity-preview">
+                  <span className="activity-icon">{getActivityIcon(duplicatingActivity.activityType)}</span>
+                  <div>
+                    <h4>{duplicatingActivity.title}</h4>
+                    <p>{getActivityTypeText(duplicatingActivity.activityType)} • Max Score: {duplicatingActivity.maxScore} pts</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Select Target Course *</label>
+                <select
+                  value={targetCourseId}
+                  onChange={(e) => setTargetCourseId(e.target.value)}
+                  required
+                >
+                  <option value="">-- Select a course --</option>
+                  {courses.map(course => (
+                    <option key={course.id} value={course.id}>
+                      {course.title}
+                    </option>
+                  ))}
+                </select>
+                <small>The activity will be duplicated to the selected course as a draft.</small>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowDuplicateModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={duplicateActivity}>
+                Duplicate Activity
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

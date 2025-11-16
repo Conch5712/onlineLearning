@@ -18,6 +18,7 @@ const ActivityDetail = () => {
   const [submissionModal, setSubmissionModal] = useState(false);
   const [gradingModal, setGradingModal] = useState(null);
   const [viewModal, setViewModal] = useState(null);
+  const [topPerformers, setTopPerformers] = useState([]);
   
   // 文件相关状态
   const [activityFiles, setActivityFiles] = useState([]);
@@ -72,6 +73,7 @@ const ActivityDetail = () => {
     fetchActivityFiles();
     if (user?.role === 'TEACHER') {
       fetchSubmissions();
+      fetchTopPerformers();
     } else if (user?.role === 'STUDENT') {
       fetchMySubmission();
     }
@@ -100,6 +102,21 @@ const ActivityDetail = () => {
       setSubmissions(response.data || []);
     } catch (error) {
       console.error('Failed to fetch submissions:', error);
+    }
+  };
+
+  const fetchTopPerformers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `http://localhost:8080/api/submissions/top-performers/activity/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setTopPerformers(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch top performers:', error);
     }
   };
 
@@ -165,6 +182,29 @@ const ActivityDetail = () => {
     } catch (error) {
       console.error('Grading failed:', error);
       alert('Grading failed: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const autoGradeQuiz = async (submissionId) => {
+    if (!window.confirm('Auto-grade this quiz submission? This will automatically calculate the score based on correct answers.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `http://localhost:8080/api/submissions/${submissionId}/auto-grade`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      alert('Quiz graded automatically!');
+      fetchSubmissions();
+    } catch (error) {
+      console.error('Auto-grading failed:', error);
+      alert('Auto-grading failed: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -446,7 +486,7 @@ const ActivityDetail = () => {
                       )}
 
                       <div className="submission-actions">
-                        <button 
+                        <button
                           onClick={() => setViewModal(submission)}
                           className="btn-secondary"
                           style={{marginRight: '10px'}}
@@ -454,18 +494,29 @@ const ActivityDetail = () => {
                           👁️ View Details
                         </button>
                         {submission.status === 'SUBMITTED' && (
-                          <button 
-                            onClick={() => {
-                              setGradingModal(submission);
-                              setGradingData({score: '', feedback: ''});
-                            }}
-                            className="btn-primary"
-                          >
-                            📝 Grade
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                setGradingModal(submission);
+                                setGradingData({score: '', feedback: ''});
+                              }}
+                              className="btn-primary"
+                              style={{marginRight: '10px'}}
+                            >
+                              📝 Grade
+                            </button>
+                            {activity.activityType === 'QUIZ' && activity.gradingMethod === 'AUTO' && (
+                              <button
+                                onClick={() => autoGradeQuiz(submission.id)}
+                                className="btn-success"
+                              >
+                                ⚡ Auto Grade
+                              </button>
+                            )}
+                          </>
                         )}
                         {submission.status === 'GRADED' && (
-                          <button 
+                          <button
                             onClick={() => {
                               setGradingModal(submission);
                               setGradingData({
@@ -489,6 +540,42 @@ const ActivityDetail = () => {
                   <p>Students haven't submitted their work for this activity.</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Teacher Leaderboard */}
+          {user?.role === 'TEACHER' && topPerformers.length > 0 && (
+            <div className="submissions-section" style={{marginTop: '30px'}}>
+              <div className="section-header">
+                <h2 className="section-title">
+                  <span className="icon">🏆</span>Top Performers
+                </h2>
+              </div>
+
+              <div className="leaderboard-container">
+                {topPerformers.map((performer, index) => (
+                  <div key={performer.studentId || index} className="leaderboard-item">
+                    <div className="rank-badge">
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                    </div>
+                    <div className="performer-info">
+                      <div className="student-avatar">
+                        {performer.studentName?.charAt(0) || 'S'}
+                      </div>
+                      <div>
+                        <h4>{performer.studentName || `Student ${performer.studentId}`}</h4>
+                        <p style={{color: '#64748b', margin: '5px 0', fontSize: '0.9em'}}>
+                          Student ID: {performer.studentId}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="performer-score">
+                      <div className="score-value">{performer.score}</div>
+                      <div className="score-label">/ {activity.maxScore} pts</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

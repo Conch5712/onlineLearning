@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import MyCourses from './MyCourses';
 import MyActivities from './MyActivities';
 import Grades from './Grades';
+import LearningProgress from './LearningProgress';
 
 const StudentDashboard = () => {
   const { user, logout } = useAuth();
@@ -29,15 +30,21 @@ const StudentDashboard = () => {
       icon: '🎯',
       badge: '2'
     },
-    { 
-      id: 'grades', 
-      name: 'Grades', 
+    {
+      id: 'grades',
+      name: 'Grades',
       description: 'View exam and assignment grades',
       icon: '📊'
     },
-    { 
-      id: 'calendar', 
-      name: 'Schedule', 
+    {
+      id: 'progress',
+      name: 'Learning Progress',
+      description: 'Track your learning journey and achievements',
+      icon: '📈'
+    },
+    {
+      id: 'calendar',
+      name: 'Schedule',
       description: 'View course schedule and important dates',
       icon: '📅'
     },
@@ -179,6 +186,9 @@ const StudentDashboard = () => {
 
       case 'grades':
         return <Grades />;
+
+      case 'progress':
+        return <LearningProgress user={user} />;
 
       default:
         return (

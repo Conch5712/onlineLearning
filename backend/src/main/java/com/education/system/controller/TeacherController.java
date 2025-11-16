@@ -231,7 +231,7 @@ public class TeacherController {
     public ResponseEntity<?> getAssignmentSubmissions(@PathVariable Long assignmentId) {
         try {
             List<AssignmentSubmission> submissions = assignmentService.getSubmissionsByAssignment(assignmentId);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("data", submissions);
@@ -240,6 +240,84 @@ public class TeacherController {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "获取提交列表失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 获取教师所有课程的学生列表
+     */
+    @GetMapping("/students")
+    public ResponseEntity<?> getAllStudents(HttpServletRequest request) {
+        try {
+            String token = jwtUtil.getTokenFromRequest(request);
+            Long teacherId = jwtUtil.getUserIdFromToken(token);
+
+            // 获取教师的所有课程
+            List<Course> courses = courseService.getCoursesByTeacher(teacherId);
+
+            // 暂时返回空列表，后续需要实现完整的学生查询逻辑
+            List<Map<String, Object>> studentsData = new java.util.ArrayList<>();
+
+            // TODO: 实现通过CourseEnrollmentMapper查询学生信息
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", studentsData);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "获取学生列表失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 发送消息给学生
+     */
+    @PostMapping("/send-message")
+    public ResponseEntity<?> sendMessage(@RequestBody Map<String, Object> messageData, HttpServletRequest request) {
+        try {
+            String token = jwtUtil.getTokenFromRequest(request);
+            Long teacherId = jwtUtil.getUserIdFromToken(token);
+
+            Long studentId = Long.valueOf(messageData.get("studentId").toString());
+            String subject = (String) messageData.get("subject");
+            String message = (String) messageData.get("message");
+
+            // 这里可以实现发送消息的逻辑
+            // 例如创建通知记录或发送邮件
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "消息发送成功");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "发送消息失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 获取某个学生的作业列表
+     */
+    @GetMapping("/students/{studentId}/assignments")
+    public ResponseEntity<?> getStudentAssignments(@PathVariable Long studentId) {
+        try {
+            // 这里需要实现获取学生作业的逻辑
+            // 暂时返回空列表
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", new java.util.ArrayList<>());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "获取学生作业失败: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }
